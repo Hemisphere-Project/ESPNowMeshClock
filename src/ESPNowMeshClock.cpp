@@ -8,18 +8,22 @@ static uint64_t defaultClockFn() {
 
 ESPNowMeshClock::ESPNowMeshClock(uint16_t interval_ms, float slew_alpha, uint32_t large_step_us, uint32_t sync_timeout_ms, uint8_t random_variation_percent, ClockFn clkfn)
     : _interval(interval_ms), _alpha(slew_alpha), _largeStep(large_step_us), _syncTimeout(sync_timeout_ms), _randomVariation(random_variation_percent),
-      _clock(clkfn ? clkfn : defaultClockFn), _offset(0), _synced(false), _lastSync(0), _lastBroadcast(0), _nextBroadcastDelay(0)
+      _clock(clkfn ? clkfn : defaultClockFn), _offset(0), _synced(false), _lastSync(0), _lastBroadcast(0), _nextBroadcastDelay(0), _userCallback(nullptr)
 {
     _instance = this;
 }
 
-void ESPNowMeshClock::begin() {
+void ESPNowMeshClock::begin(bool registerCallback) {
     WiFi.mode(WIFI_STA);
     if(esp_now_init() != ESP_OK) {
         Serial.println("[ERR] ESP-NOW INIT FAILED");
         delay(1000); ESP.restart();
     }
-    esp_now_register_recv_cb(_onReceive);
+    
+    // Only register callback if requested (allows user to handle ESP-NOW manually)
+    if (registerCallback) {
+        esp_now_register_recv_cb(_onReceive);
+    }
 
     // Add broadcast peer
     esp_now_peer_info_t peerInfo = {};
@@ -44,11 +48,42 @@ SyncState ESPNowMeshClock::getSyncState() {
     return SyncState::SYNCED;
 }
 
+bool ESPNowMeshClock::handleReceive(const uint8_t *mac, const uint8_t *data, int len) {
+    // Check if this is a mesh clock packet (must be exactly 10 bytes)
+    if(len == sizeof(MeshClockPacket)) {
+        const MeshClockPacket* packet = (const MeshClockPacket*)data;
+        
+        // Validate magic header "MCK"
+        if(packet->magic[0] == MESHCLOCK_MAGIC_0 &&
+           packet->magic[1] == MESHCLOCK_MAGIC_1 &&
+           packet->magic[2] == MESHCLOCK_MAGIC_2) {
+            
+            // Extract 56-bit timestamp (7 bytes) into uint64_t
+            uint64_t remoteMicros = 0;
+            for(int i = 0; i < 7; i++) {
+                remoteMicros |= ((uint64_t)packet->timestamp[i]) << (i * 8);
+            }
+            
+            _adjust(remoteMicros);
+            return true;  // Packet was handled
+        }
+    }
+    return false;  // Not a clock packet
+}
+
+void ESPNowMeshClock::setUserCallback(ESPNowRecvCallback callback) {
+    _userCallback = callback;
+}
+
 void ESPNowMeshClock::_onReceive(const uint8_t *mac, const uint8_t *data, int len) {
-    if(len == sizeof(uint64_t) && _instance) {
-        uint64_t remoteMicros;
-        memcpy(&remoteMicros, data, sizeof(remoteMicros));
-        _instance->_adjust(remoteMicros);
+    if(_instance) {
+        // Try to handle as clock packet
+        bool handled = _instance->handleReceive(mac, data, len);
+        
+        // If not a clock packet and user callback is set, forward to user
+        if (!handled && _instance->_userCallback) {
+            _instance->_userCallback(mac, data, len);
+        }
     }
 }
 
@@ -75,7 +110,19 @@ void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
 
 void ESPNowMeshClock::_broadcast() {
     uint64_t stamp = meshMicros();
-    esp_err_t result = esp_now_send(bcastAddr, (uint8_t*)&stamp, sizeof(stamp));
+    
+    // Prepare packet with magic header and 7-byte timestamp
+    MeshClockPacket packet;
+    packet.magic[0] = MESHCLOCK_MAGIC_0;
+    packet.magic[1] = MESHCLOCK_MAGIC_1;
+    packet.magic[2] = MESHCLOCK_MAGIC_2;
+    
+    // Pack 56-bit timestamp (7 bytes, little-endian)
+    for(int i = 0; i < 7; i++) {
+        packet.timestamp[i] = (stamp >> (i * 8)) & 0xFF;
+    }
+    
+    esp_err_t result = esp_now_send(bcastAddr, (uint8_t*)&packet, sizeof(packet));
     if(result == ESP_OK) {
         Serial.printf("[MeshClock BCAST] Sent time: %llu\n", stamp);
     } else {

@@ -9,13 +9,14 @@ Distributed, driverless 64-bit time sync—perfect for synchronized DMX, MIDI, M
 ## Features
 
 - Distributed: every node broadcasts its local mesh time, others align (forward-only, monotonic)
-- **No rollover risk**: uses embedded **libclock** with 64-bit hardware timer (`fastmicros64_isr`).
+- **No rollover risk**: uses embedded **libclock** with 64-bit hardware timer (`fastmicros64_isr`), and clock value is broadcasted as 56-bit value (~2283 years rollover).
 - Slewed/smoothed time alignment: handles radio packet jitter and burst/delay gracefully
 - **Collision avoidance**: randomized broadcast intervals prevent packet collisions in dense meshes
 - **State monitoring**: query sync status (ALONE, SYNCED, LOST)
 - **Configurable timeout**: detect and report lost mesh connectivity
 - Robust across network loss/packet drop—self-healing mesh
 - Simple API: just call `begin()` + `loop()`
+- **ESP-NOW compatible**: works alongside existing ESP-NOW code via callback delegation/chaining with magic header packet identification
 - Plug-and-play with PlatformIO: drop into any project (`lib_deps`)
 
 ---
@@ -135,21 +136,30 @@ ESPNowMeshClock meshClock(1000, 0.25, 10000, 5000, 25);
 
 ### Public Methods
 
-#### `void begin()`
+#### `void begin(bool registerCallback = true)`
 
 Initializes the mesh clock synchronization. Must be called in `setup()` before using the clock.
+
+**Parameters:**
+- `registerCallback` (default: true): If true, registers internal ESP-NOW receive callback. Set to false if you want to manage ESP-NOW callbacks yourself (see [ESP-NOW Integration](#esp-now-integration)).
 
 **Actions:**
 - Sets WiFi to station mode
 - Initializes ESP-NOW
-- Registers receive callback
+- Registers receive callback (if `registerCallback` is true)
 - Adds broadcast peer
 
 **Example:**
 ```cpp
 void setup() {
     Serial.begin(115200);
-    meshClock.begin();
+    meshClock.begin();  // Standard usage
+}
+
+// OR for custom ESP-NOW integration:
+void setup() {
+    meshClock.begin(false);  // Don't register callback
+    esp_now_register_recv_cb(myCallback);  // Use your own
 }
 ```
 
@@ -238,6 +248,60 @@ switch(state) {
 
 ---
 
+#### `bool handleReceive(const uint8_t *mac, const uint8_t *data, int len)`
+
+Manually process an ESP-NOW packet to check if it's a mesh clock packet. Use this when managing your own ESP-NOW callbacks.
+
+**Packet Identification:**
+- Checks for exactly 10 bytes
+- Validates "MCK" magic header (0x4D, 0x43, 0x4B)
+- Extracts 56-bit timestamp if valid
+
+**Parameters:**
+- `mac`: MAC address of sender
+- `data`: Packet data
+- `len`: Packet length
+
+**Returns:** `true` if the packet was a valid mesh clock packet (processed), `false` otherwise
+
+**Example:**
+```cpp
+void myESPNowCallback(const uint8_t *mac, const uint8_t *data, int len) {
+    if (meshClock.handleReceive(mac, data, len)) {
+        return;  // Was a clock packet (10 bytes with "MCK" header)
+    }
+    // Handle your own packets here
+}
+```
+
+See [ESP-NOW Integration](#esp-now-integration) for complete examples.
+
+---
+
+#### `void setUserCallback(ESPNowRecvCallback callback)`
+
+Register a callback to receive non-clock ESP-NOW packets. The library will automatically route 8-byte packets to the mesh clock and forward all other packets to your callback.
+
+**Parameters:**
+- `callback`: Function pointer with signature `void callback(const uint8_t *mac, const uint8_t *data, int len)`
+
+**Example:**
+```cpp
+void myCallback(const uint8_t *mac, const uint8_t *data, int len) {
+    // Only receives packets that are NOT mesh clock packets
+    Serial.printf("Custom packet: %d bytes\n", len);
+}
+
+void setup() {
+    meshClock.setUserCallback(myCallback);
+    meshClock.begin();  // Auto-routing enabled
+}
+```
+
+See [ESP-NOW Integration](#esp-now-integration) for complete examples.
+
+---
+
 ## Examples
 
 The library includes several example sketches to help you get started:
@@ -269,11 +333,105 @@ Demonstrates perfect synchronization across multiple devices:
 - Shows how to use mesh time for coordinated animations
 - Includes alternative pattern examples (breathing, pulses)
 
+### CustomESPNowIntegration_Option1
+**Location:** `examples/CustomESPNowIntegration_Option1/CustomESPNowIntegration_Option1.ino`
+
+For projects that already use ESP-NOW - manual integration:
+- You manage your own ESP-NOW callback
+- Call `meshClock.handleReceive()` to process clock packets
+- Full control over packet routing
+- Perfect for complex ESP-NOW applications
+
+### CustomESPNowIntegration_Option2
+**Location:** `examples/CustomESPNowIntegration_Option2/CustomESPNowIntegration_Option2.ino`
+
+For projects that already use ESP-NOW - automatic chaining:
+- Register your callback with `meshClock.setUserCallback()`
+- Library automatically routes packets
+- 8-byte packets → mesh clock (handled internally)
+- Other packets → your callback
+- Simpler integration than Option 1
+
+---
+
+## ESP-NOW Integration
+
+**Important:** ESP-NOW only supports a single receive callback. If your project already uses ESP-NOW, choose one of these integration methods:
+
+### Option 1: Manual Receive Handling (Full Control)
+
+```cpp
+ESPNowMeshClock meshClock;
+
+void myESPNowCallback(const uint8_t *mac, const uint8_t *data, int len) {
+    // Let mesh clock process if it's a clock packet
+    if (meshClock.handleReceive(mac, data, len)) {
+        return;  // Was a clock packet, done
+    }
+    
+    // Otherwise handle your own ESP-NOW messages
+    // ... your code ...
+}
+
+void setup() {
+    meshClock.begin(false);  // false = don't register own callback
+    esp_now_register_recv_cb(myESPNowCallback);
+}
+```
+
+### Option 2: Callback Chaining (Automatic Routing)
+
+```cpp
+ESPNowMeshClock meshClock;
+
+void myCustomCallback(const uint8_t *mac, const uint8_t *data, int len) {
+    // Only receives NON-clock packets (not 8 bytes)
+    // ... handle your messages ...
+}
+
+void setup() {
+    meshClock.setUserCallback(myCustomCallback);
+    meshClock.begin();  // Registers callback with auto-chaining
+}
+```
+
+**New API Methods:**
+- `bool handleReceive(mac, data, len)` - Returns true if packet was a clock packet (10 bytes with "MCK" magic header)
+- `void setUserCallback(callback)` - Set callback for non-clock packets
+- `void begin(bool registerCallback = true)` - Optional callback registration
+
+---
+
+## Packet Format
+
+Mesh clock packets are identified by a unique magic header to prevent conflicts with other ESP-NOW messages.
+
+**Packet Structure (10 bytes total):**
+```
+Offset | Size | Description
+-------|------|-------------
+0-2    | 3    | Magic header: "MCK" (0x4D, 0x43, 0x4B)
+3-9    | 7    | Timestamp: 56-bit microseconds (little-endian)
+```
+
+**Why 56-bit timestamp?**
+- Rollover period: ~2,283 years (vs 584,000 years for 64-bit)
+- Compact packet size: 10 bytes total
+- More than sufficient for any practical application
+
+**Magic Header "MCK":**
+- Prevents misidentification of random 10-byte packets
+- Allows multiple ESP-NOW protocols to coexist
+- Future-proof for protocol versioning
+
+Only packets matching this exact format will be processed as mesh clock packets. All other ESP-NOW packets will be ignored or forwarded to your custom callback (if using ESP-NOW integration).
+
 ---
 
 ## Implementation Details
 
 - Each node broadcasts its mesh time every N ms (default: 1000ms ± 10% random variation)
+- Broadcast packet: 10 bytes ("MCK" + 56-bit timestamp)
 - Random variation prevents broadcast collisions in dense meshes
 - On receive, any node forward-only slews its offset toward the most advanced clock (large steps only at first sync)
 - Smoothing parameter (`slew_alpha`) ensures jumps are absorbed rather than causing AV/motion artifacts

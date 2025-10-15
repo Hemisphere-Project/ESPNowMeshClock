@@ -64,6 +64,43 @@ Upload this sketch to multiple ESP32s and watch them all blink in perfect synchr
 
 ---
 
+### 4. CustomESPNowIntegration_Option1
+**File:** `CustomESPNowIntegration_Option1/CustomESPNowIntegration_Option1.ino`  
+**Difficulty:** Advanced
+
+Manual ESP-NOW integration for full control.
+
+**What you'll learn:**
+- Integrating mesh clock into existing ESP-NOW projects
+- Managing your own ESP-NOW callback
+- Using `handleReceive()` to route packets
+- Sending both clock and custom messages
+
+**When to use:**
+- Your project already uses ESP-NOW
+- You need full control over packet routing
+- Complex multi-protocol applications
+
+---
+
+### 5. CustomESPNowIntegration_Option2
+**File:** `CustomESPNowIntegration_Option2/CustomESPNowIntegration_Option2.ino`  
+**Difficulty:** Advanced
+
+Automatic callback chaining for simpler ESP-NOW integration.
+
+**What you'll learn:**
+- Using `setUserCallback()` for automatic routing
+- Letting the library handle packet discrimination
+- Simpler integration than Option 1
+
+**When to use:**
+- Your project already uses ESP-NOW
+- You want automatic packet routing
+- Prefer simpler integration code
+
+---
+
 ## How to Use These Examples
 
 ### Arduino IDE
