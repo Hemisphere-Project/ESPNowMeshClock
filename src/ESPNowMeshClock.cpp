@@ -120,7 +120,11 @@ bool ESPNowMeshClock::handleReceive(const uint8_t *mac, const uint8_t *data, int
         uint32_t usecs = remoteMicros % 1000000;
         Serial.printf("[MeshClock RX] Valid clock packet: %llu us (%u.%06u s)\r\n", 
                       remoteMicros, secs, usecs);
-    }}
+    }
+    
+    _adjust(remoteMicros);
+    return true;  // Packet was handled
+}
 
 void ESPNowMeshClock::setUserCallback(ESPNowRecvCallback callback) {
     _userCallback = callback;
