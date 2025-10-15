@@ -3,7 +3,7 @@
 ESPNowMeshClock* ESPNowMeshClock::_instance = nullptr;
 
 static uint64_t defaultClockFn() {
-    return fastmicros64_isr();
+    return fastmicros64();  // Use safe version with double-read protection
 }
 
 ESPNowMeshClock::ESPNowMeshClock(uint16_t interval_ms, float slew_alpha, uint32_t large_step_us, uint32_t sync_timeout_ms, uint8_t random_variation_percent, ClockFn clkfn)
@@ -18,12 +18,30 @@ void ESPNowMeshClock::begin(bool registerCallback) {
     if (_clock == defaultClockFn) {
         static bool timersInitialized = false;
         if (!timersInitialized) {
+            Serial.println("[ESPNowMeshClock] Initializing timer...");
+            Serial.print("[ESPNowMeshClock] Chip: ");
+            Serial.println(ESP.getChipModel());
+            Serial.printf("[ESPNowMeshClock] CPU Freq: %d MHz\n", getCpuFrequencyMhz());
+            Serial.flush();
+            
             fastinit();
             timersInitialized = true;
-            delay(10);  // Give timers time to start
-            uint64_t test = _clock();
-            Serial.printf("[ESPNowMeshClock] Timer initialized, test read: %llu\n", test);
+            
+            delay(100);  // Give timers time to start counting
+            
+            // Test timer multiple times
+            uint64_t test1 = fastmicros64();
+            delayMicroseconds(1000);
+            uint64_t test2 = fastmicros64();
+            
+            Serial.printf("[ESPNowMeshClock] Timer test: %llu -> %llu (diff: %llu us)\n", 
+                         test1, test2, test2 - test1);
             Serial.flush();
+            
+            if (test1 == 0 && test2 == 0) {
+                Serial.println("[ERROR] Timer not counting! Using micros() fallback.");
+                Serial.flush();
+            }
         }
     }
     
