@@ -167,20 +167,38 @@ void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
     // Track last successful sync reception
     _lastSync = millis();
     
+    // Direct clock set needed (first sync or large deviation)
     if(!_synced || abs(delta) > _largeStep) {
-        _offset += delta; _synced = true;
-        Serial.printf("[MeshClock SYNC] Direct clock set. Offset now: %lld\r\n", (int64_t)_offset);
-        Serial.flush();
+        if(delta > 0) {
+            // Remote is ahead: adjust forward
+            _offset += delta;
+            _synced = true;
+            Serial.printf("[MeshClock SYNC] Direct set forward. Offset: %lld us, Delta: %lld us\r\n", 
+                         (int64_t)_offset, (int64_t)delta);
+            Serial.flush();
+        } else {
+            // Remote is behind: ignore (forward-only), but mark as synced
+            _synced = true;
+            Serial.printf("[MeshClock SYNC] Ignored (remote behind by %lld us, forward-only)\r\n", 
+                         (int64_t)(-delta));
+            Serial.flush();
+        }
         return;
     }
+    
+    // Small adjustment: slew forward only
     if(delta > 0) {
         uint64_t step = (uint64_t)(delta * _alpha);
         _offset += step;
-        Serial.printf("[MeshClock SYNC] Slewed clock: Offset %lld, Step %llu, Delta %lld\r\n",
+        Serial.printf("[MeshClock SYNC] Slewed forward. Offset: %lld us, Step: %llu us, Delta: %lld us\r\n",
                       (int64_t)_offset, step, (int64_t)delta);
         Serial.flush();
+    } else {
+        // Remote is behind or equal: no adjustment (forward-only)
+        Serial.printf("[MeshClock SYNC] No adjustment (remote behind by %lld us)\r\n", 
+                     (int64_t)(-delta));
+        Serial.flush();
     }
-    // If delta < 0, local is already ahead - no adjustment needed (forward-only)
 }
 
 void ESPNowMeshClock::_broadcast() {
