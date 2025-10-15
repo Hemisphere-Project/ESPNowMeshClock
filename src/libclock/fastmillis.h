@@ -66,25 +66,43 @@ SOFTWARE.
  * 	Much faster millis() / micros() implementation
  * 	using hardware timer to avoid the mess that is
  *  esp_timer_get_time()
+ * 
+ *  NOTE: Timer register addresses are different for each ESP32 variant!
+ *  ESP32:    0x3FF5F000
+ *  ESP32-S2: 0x3FF5F000 (same as ESP32)
+ *  ESP32-S3: 0x60007000 (DIFFERENT!)
+ *  ESP32-C3: 0x6001F000 (DIFFERENT!)
  **************************************************************/
 
 void fastinit();
 
-#define TIMG0_T0CONFIG_REG (*(volatile unsigned *)(0x3FF5F000)) // configuration register
-#define TIMG0_T0LO_REG     (*(volatile uint32_t*)(0x3FF5F004)) // bottom 32-bits of the timer value
-#define TIMG0_T0HI_REG     (*(volatile uint32_t*)(0x3FF5F008)) // top 32-bits of the timer value
-#define TIMG0_T0UPDATE_REG (*(volatile uint32_t*)(0x3FF5F00C)) // write any value this to latch the timer value into hi_reg and lo_reg
-#define TIMG0_T0LOAD_LO_REG (*(volatile uint32_t*)(0x3FF5F018)) 
-#define TIMG0_T0LOAD_HI_REG (*(volatile uint32_t*)(0x3FF5F01C)) 
-#define TIMG0_T0LOAD_REG    (*(volatile uint32_t*)(0x3FF5F020)) 
+// Timer register definitions based on chip variant
+#if CONFIG_IDF_TARGET_ESP32S3
+  #define TIMG0_BASE 0x6001F000
+#elif CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6 || CONFIG_IDF_TARGET_ESP32H2
+  #define TIMG0_BASE 0x6001F000
+#elif CONFIG_IDF_TARGET_ESP32S2
+  #define TIMG0_BASE 0x3FF5F000
+#else
+  // Original ESP32
+  #define TIMG0_BASE 0x3FF5F000
+#endif
 
-#define TIMG0_T1CONFIG_REG (*(volatile unsigned *)(0x3FF5F024)) // configuration register
-#define TIMG0_T1LO_REG     (*(volatile unsigned *)(0x3FF5F028))
-#define TIMG0_T1HI_REG     (*(volatile unsigned *)(0x3FF5F02C))
-#define TIMG0_T1UPDATE_REG (*(volatile unsigned *)(0x3FF5F030))
-#define TIMG0_T1LOAD_LO_REG (*(volatile uint32_t*)(0x3FF5F03C)) 
-#define TIMG0_T1LOAD_HI_REG (*(volatile uint32_t*)(0x3FF5F040)) 
-#define TIMG0_T1LOAD_REG    (*(volatile uint32_t*)(0x3FF5F044)) 
+#define TIMG0_T0CONFIG_REG (*(volatile unsigned *)(TIMG0_BASE + 0x000)) // configuration register
+#define TIMG0_T0LO_REG     (*(volatile uint32_t*)(TIMG0_BASE + 0x004)) // bottom 32-bits of the timer value
+#define TIMG0_T0HI_REG     (*(volatile uint32_t*)(TIMG0_BASE + 0x008)) // top 32-bits of the timer value
+#define TIMG0_T0UPDATE_REG (*(volatile uint32_t*)(TIMG0_BASE + 0x00C)) // write any value this to latch the timer value into hi_reg and lo_reg
+#define TIMG0_T0LOAD_LO_REG (*(volatile uint32_t*)(TIMG0_BASE + 0x018)) 
+#define TIMG0_T0LOAD_HI_REG (*(volatile uint32_t*)(TIMG0_BASE + 0x01C)) 
+#define TIMG0_T0LOAD_REG    (*(volatile uint32_t*)(TIMG0_BASE + 0x020)) 
+
+#define TIMG0_T1CONFIG_REG (*(volatile unsigned *)(TIMG0_BASE + 0x024)) // configuration register
+#define TIMG0_T1LO_REG     (*(volatile unsigned *)(TIMG0_BASE + 0x028))
+#define TIMG0_T1HI_REG     (*(volatile unsigned *)(TIMG0_BASE + 0x02C))
+#define TIMG0_T1UPDATE_REG (*(volatile unsigned *)(TIMG0_BASE + 0x030))
+#define TIMG0_T1LOAD_LO_REG (*(volatile uint32_t*)(TIMG0_BASE + 0x03C)) 
+#define TIMG0_T1LOAD_HI_REG (*(volatile uint32_t*)(TIMG0_BASE + 0x040)) 
+#define TIMG0_T1LOAD_REG    (*(volatile uint32_t*)(TIMG0_BASE + 0x044)) 
 
 /*  INTERRUPT SAFE, usable in interrupts and userland code
     This does only one load, so it doesn't have any wraparound issues.

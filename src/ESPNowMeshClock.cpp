@@ -3,7 +3,7 @@
 ESPNowMeshClock* ESPNowMeshClock::_instance = nullptr;
 
 static uint64_t defaultClockFn() {
-    return fastmicros64();  // Use safe version with double-read protection
+    return fastmicros64_isr();
 }
 
 ESPNowMeshClock::ESPNowMeshClock(uint16_t interval_ms, float slew_alpha, uint32_t large_step_us, uint32_t sync_timeout_ms, uint8_t random_variation_percent, ClockFn clkfn)
@@ -30,16 +30,21 @@ void ESPNowMeshClock::begin(bool registerCallback) {
             delay(100);  // Give timers time to start counting
             
             // Test timer multiple times
-            uint64_t test1 = fastmicros64();
+            uint64_t test1 = fastmicros64_isr();
             delayMicroseconds(1000);
-            uint64_t test2 = fastmicros64();
+            uint64_t test2 = fastmicros64_isr();
             
             Serial.printf("[ESPNowMeshClock] Timer test: %llu -> %llu (diff: %llu us)\n", 
                          test1, test2, test2 - test1);
             Serial.flush();
             
             if (test1 == 0 && test2 == 0) {
-                Serial.println("[ERROR] Timer not counting! Using micros() fallback.");
+                Serial.println("╔════════════════════════════════════════════════════════════╗");
+                Serial.println("║ [CRITICAL ERROR] Hardware timer NOT working!              ║");
+                Serial.println("║ fastmicros64_isr() is returning 0.                        ║");
+                Serial.println("║ Clock synchronization will NOT function correctly.        ║");
+                Serial.println("║ Check timer registers for your ESP32 variant.             ║");
+                Serial.println("╚════════════════════════════════════════════════════════════╝");
                 Serial.flush();
             }
         }
