@@ -201,7 +201,7 @@ void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
 }
 
 void ESPNowMeshClock::_broadcast() {
-    uint64_t stamp = meshMicros();
+    uint64_t stamp = meshMicros() + TRANSMISSION_DELAY_US;
 
     // Prepare packet with magic header and 7-byte timestamp
     MeshClockPacket packet;

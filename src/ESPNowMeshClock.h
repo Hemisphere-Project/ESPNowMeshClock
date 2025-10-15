@@ -9,6 +9,10 @@
 #define MESHCLOCK_MAGIC_1 0x43  // 'C'
 #define MESHCLOCK_MAGIC_2 0x4B  // 'K'
 
+#ifndef TRANSMISSION_DELAY_US
+    #define TRANSMISSION_DELAY_US 1000  // Estimated one-way transmission delay in microseconds
+#endif
+
 // Mesh clock packet structure (10 bytes total)
 // 3-byte magic header + 7-byte timestamp (56-bit) = ~2283 years rollover
 struct MeshClockPacket {
