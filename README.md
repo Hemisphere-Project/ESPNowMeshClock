@@ -28,7 +28,7 @@ Add this to your `platformio.ini`:
 
 ```
 lib_deps =
-    https://github.com/YOURUSERNAME/ESPNowMeshClock.git
+    https://github.com/Hemisphere-Project/ESPNowMeshClock.git
 ```
 
 ### Example Sketch
