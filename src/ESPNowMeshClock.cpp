@@ -21,7 +21,7 @@ void ESPNowMeshClock::begin(bool registerCallback) {
             Serial.println("[ESPNowMeshClock] Initializing timer...");
             Serial.print("[ESPNowMeshClock] Chip: ");
             Serial.println(ESP.getChipModel());
-            Serial.printf("[ESPNowMeshClock] CPU Freq: %d MHz\n", getCpuFrequencyMhz());
+            Serial.printf("[ESPNowMeshClock] CPU Freq: %d MHz\r\n", getCpuFrequencyMhz());
             Serial.flush();
             
             fastinit();
@@ -34,7 +34,7 @@ void ESPNowMeshClock::begin(bool registerCallback) {
             delayMicroseconds(1000);
             uint64_t test2 = fastmicros64_isr();
             
-            Serial.printf("[ESPNowMeshClock] Timer test: %llu -> %llu (diff: %llu us)\n", 
+            Serial.printf("[ESPNowMeshClock] Timer test: %llu -> %llu (diff: %llu us)\r\n", 
                          test1, test2, test2 - test1);
             Serial.flush();
             
@@ -88,13 +88,13 @@ SyncState ESPNowMeshClock::getSyncState() {
 
 bool ESPNowMeshClock::handleReceive(const uint8_t *mac, const uint8_t *data, int len) {
     // Log all received packets for debugging
-    Serial.printf("[MeshClock RX] Received %d bytes from %02X:%02X:%02X:%02X:%02X:%02X\n",
+    Serial.printf("[MeshClock RX] Received %d bytes from %02X:%02X:%02X:%02X:%02X:%02X\r\n",
                   len, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     Serial.flush();
     
     // Check if this is a mesh clock packet (must be exactly 10 bytes)
     if(len != sizeof(MeshClockPacket)) {
-        Serial.printf("[MeshClock RX] Discarded: Wrong size (expected %d bytes)\n", sizeof(MeshClockPacket));
+        Serial.printf("[MeshClock RX] Discarded: Wrong size (expected %d bytes)\r\n", sizeof(MeshClockPacket));
         Serial.flush();
         return false;
     }
@@ -105,7 +105,7 @@ bool ESPNowMeshClock::handleReceive(const uint8_t *mac, const uint8_t *data, int
     if(packet->magic[0] != MESHCLOCK_MAGIC_0 ||
        packet->magic[1] != MESHCLOCK_MAGIC_1 ||
        packet->magic[2] != MESHCLOCK_MAGIC_2) {
-        Serial.printf("[MeshClock RX] Discarded: Invalid magic header (%02X %02X %02X)\n",
+        Serial.printf("[MeshClock RX] Discarded: Invalid magic header (%02X %02X %02X)\r\n",
                       packet->magic[0], packet->magic[1], packet->magic[2]);
         Serial.flush();
         return false;
@@ -119,7 +119,7 @@ bool ESPNowMeshClock::handleReceive(const uint8_t *mac, const uint8_t *data, int
     
     uint32_t secs = remoteMicros / 1000000;
     uint32_t usecs = remoteMicros % 1000000;
-    Serial.printf("[MeshClock RX] Valid clock packet: %llu us (%u.%06u s)\n", 
+    Serial.printf("[MeshClock RX] Valid clock packet: %llu us (%u.%06u s)\r\n", 
                   remoteMicros, secs, usecs);
     Serial.flush();
     
@@ -169,14 +169,14 @@ void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
     
     if(!_synced || abs(delta) > _largeStep) {
         _offset += delta; _synced = true;
-        Serial.printf("[MeshClock SYNC] Direct clock set. Offset now: %lld\n", (int64_t)_offset);
+        Serial.printf("[MeshClock SYNC] Direct clock set. Offset now: %lld\r\n", (int64_t)_offset);
         Serial.flush();
         return;
     }
     if(delta > 0) {
         uint64_t step = (uint64_t)(delta * _alpha);
         _offset += step;
-        Serial.printf("[MeshClock SYNC] Slewed clock: Offset %lld, Step %llu, Delta %lld\n",
+        Serial.printf("[MeshClock SYNC] Slewed clock: Offset %lld, Step %llu, Delta %lld\r\n",
                       (int64_t)_offset, step, (int64_t)delta);
         Serial.flush();
     }
@@ -201,7 +201,7 @@ void ESPNowMeshClock::_broadcast() {
     if(result == ESP_OK) {
         uint32_t secs = stamp / 1000000;
         uint32_t usecs = stamp % 1000000;
-        Serial.printf("[MeshClock BCAST] Sent time: %llu us (%u.%06u s)\n", stamp, secs, usecs);
+        Serial.printf("[MeshClock BCAST] Sent time: %llu us (%u.%06u s)\r\n", stamp, secs, usecs);
         Serial.flush();
     } else {
         Serial.println("[MeshClock ERROR] Failed to send time");
