@@ -25,6 +25,11 @@ SOFTWARE.
 #include "config.h"
 #include "fastmillis.h"
 
+// Define CPU_FREQUENCY_MHZ if not already defined (compatibility with newer ESP32 cores)
+#ifndef CPU_FREQUENCY_MHZ
+#define CPU_FREQUENCY_MHZ (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ)
+#endif
+
 /**************************************************************
  *	ESP32
  * 	Much faster millis() / micros() implementation
@@ -33,10 +38,9 @@ SOFTWARE.
  **************************************************************/
 
 void fastinit() {
-	timerBegin(0, 80, true);
-	timerBegin(1, 40000, true);
-	return;
-
+	// Direct register initialization for compatibility with all ESP32 core versions
+	// This bypasses the timerBegin() API which changed in Core 3.x
+	
 	// divide APB_CLK by 80 to get 1MHz, for 1µs timer
 	unsigned divider = 80;
 	TIMG0_T0CONFIG_REG = 0x00000000 | (divider<<13);	// timer must be disabled to change prescaler setting

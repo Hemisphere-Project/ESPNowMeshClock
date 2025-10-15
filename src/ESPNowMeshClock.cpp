@@ -11,6 +11,16 @@ ESPNowMeshClock::ESPNowMeshClock(uint16_t interval_ms, float slew_alpha, uint32_
       _clock(clkfn ? clkfn : defaultClockFn), _offset(0), _synced(false), _lastSync(0), _lastBroadcast(0), _nextBroadcastDelay(0), _userCallback(nullptr)
 {
     _instance = this;
+    
+    // Initialize hardware timers for accurate 64-bit microsecond counting
+    // Only needed if using default clock (fastmicros64_isr)
+    if (!clkfn) {
+        static bool timersInitialized = false;
+        if (!timersInitialized) {
+            fastinit();
+            timersInitialized = true;
+        }
+    }
 }
 
 void ESPNowMeshClock::begin(bool registerCallback) {
