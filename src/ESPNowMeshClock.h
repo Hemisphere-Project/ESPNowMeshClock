@@ -59,7 +59,11 @@ private:
     uint32_t _nextBroadcastDelay;
     ESPNowRecvCallback _userCallback;
 
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    static void _onReceive(const esp_now_recv_info *recv_info, const uint8_t *data, int len);
+    #else
     static void _onReceive(const uint8_t *mac, const uint8_t *data, int len);
+    #endif
     static ESPNowMeshClock* _instance;
     void _adjust(uint64_t remoteMicros);
     void _broadcast();

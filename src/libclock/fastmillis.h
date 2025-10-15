@@ -25,6 +25,11 @@ SOFTWARE.
 #pragma once
 #include <Arduino.h>
 
+// Define CPU_FREQUENCY_MHZ if not already defined (compatibility with newer ESP32 cores)
+#ifndef CPU_FREQUENCY_MHZ
+#define CPU_FREQUENCY_MHZ (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ)
+#endif
+
 /**************************************************************
  *  Implementation of interrupt disable
  **************************************************************/

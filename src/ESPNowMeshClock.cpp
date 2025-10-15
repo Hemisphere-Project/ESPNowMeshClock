@@ -85,6 +85,22 @@ void ESPNowMeshClock::setUserCallback(ESPNowRecvCallback callback) {
     _userCallback = callback;
 }
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+void ESPNowMeshClock::_onReceive(const esp_now_recv_info *recv_info, const uint8_t *data, int len) {
+    if(_instance) {
+        // Extract MAC address from recv_info (new API)
+        const uint8_t *mac = recv_info->src_addr;
+        
+        // Try to handle as clock packet
+        bool handled = _instance->handleReceive(mac, data, len);
+        
+        // If not a clock packet and user callback is set, forward to user
+        if (!handled && _instance->_userCallback) {
+            _instance->_userCallback(mac, data, len);
+        }
+    }
+}
+#else
 void ESPNowMeshClock::_onReceive(const uint8_t *mac, const uint8_t *data, int len) {
     if(_instance) {
         // Try to handle as clock packet
@@ -96,6 +112,7 @@ void ESPNowMeshClock::_onReceive(const uint8_t *mac, const uint8_t *data, int le
         }
     }
 }
+#endif
 
 void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
     uint64_t localMicros = _clock() + _offset;
