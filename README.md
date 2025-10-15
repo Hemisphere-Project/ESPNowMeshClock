@@ -1,17 +1,15 @@
 # ESPNowMeshClock
-ESP32 library for synchronizing clocks amongst many units using a mesh approach over ESP-NOW.
 
----
+**Robust monotonic mesh time synchronization library for ESP32 over ESP-NOW radio.** 
 
-**Robust monotonic mesh time synchronization library for ESP32 over ESP-NOW radio.**  
 Distributed, driverless 64-bit time sync—perfect for synchronized DMX, MIDI, MTC, media, lighting and show control mesh applications.. or whatever you want to do with wireless micro-seconds accuracy sync !
 
 ---
 
 ## Features
 
-- Distributed (no single master): every node broadcasts its local mesh time, others align (forward-only, monotonic)
-- **No rollover risk**: uses embedded [`libclock`](#libclock-by-peufeu-mit) with 64-bit hardware timer (`fastmicros64_isr`). It will actually rollover after.. 584 millennia.
+- Distributed: every node broadcasts its local mesh time, others align (forward-only, monotonic)
+- **No rollover risk**: uses embedded **libclock** with 64-bit hardware timer (`fastmicros64_isr`).
 - Slewed/smoothed time alignment: handles radio packet jitter and burst/delay gracefully
 - **Collision avoidance**: randomized broadcast intervals prevent packet collisions in dense meshes
 - **State monitoring**: query sync status (ALONE, SYNCED, LOST)
@@ -28,14 +26,14 @@ Distributed, driverless 64-bit time sync—perfect for synchronized DMX, MIDI, M
 
 Add this to your `platformio.ini`:
 
-'''
+```
 lib_deps =
     https://github.com/YOURUSERNAME/ESPNowMeshClock.git
-'''
+```
 
 ### Example Sketch
 
-'''
+```
 #include <ESPNowMeshClock.h>
 
 // Create mesh clock with:
@@ -87,14 +85,14 @@ void loop() {
     
     delay(10);
 }
-'''
+```
 
 ---
 
 ## Why not micros()?
 
 The Arduino `micros()` function on ESP32 is 32-bit and wraps every ~71min (*breaking* any forward-only mesh time sync algorithm after a single wrap)!  
-By embedding [`libclock`](#libclock-by-peufeu-mit), this library defaults to `fastmicros64_isr()`, a true 64-bit hardware timer—**no rollover, maximum robustness.**
+By embedding **libclock**, this library defaults to `fastmicros64_isr()`, a true 64-bit hardware timer—**no rollover, maximum robustness.**
 
 ---
 
@@ -160,6 +158,7 @@ void setup() {
 #### `void loop()`
 
 Handles periodic broadcast of mesh time. Must be called frequently in main `loop()`.
+It is a low priority task, since it only handles periodic broadcasting.
 
 **Actions:**
 - Checks if broadcast interval has elapsed
@@ -252,8 +251,6 @@ A simple introduction to the library showing:
 - Using mesh time for coordinated actions
 - Serial output of sync status
 
-Perfect for understanding the fundamentals.
-
 ### StateMonitoring
 **Location:** `examples/StateMonitoring/StateMonitoring.ino`
 
@@ -263,8 +260,6 @@ Advanced state monitoring with visual feedback:
 - Custom configuration for faster sync
 - Pretty-printed serial output with boxes and symbols
 
-Great for debugging and understanding mesh behavior.
-
 ### SynchronizedLED
 **Location:** `examples/SynchronizedLED/SynchronizedLED.ino`
 
@@ -273,8 +268,6 @@ Demonstrates perfect synchronization across multiple devices:
 - All devices in the mesh blink in perfect unison
 - Shows how to use mesh time for coordinated animations
 - Includes alternative pattern examples (breathing, pulses)
-
-Ideal for light shows, DMX control, and coordinated displays.
 
 ---
 
