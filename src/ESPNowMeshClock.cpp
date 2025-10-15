@@ -87,26 +87,44 @@ SyncState ESPNowMeshClock::getSyncState() {
 }
 
 bool ESPNowMeshClock::handleReceive(const uint8_t *mac, const uint8_t *data, int len) {
+    // Log all received packets for debugging
+    Serial.printf("[MeshClock RX] Received %d bytes from %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  len, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    Serial.flush();
+    
     // Check if this is a mesh clock packet (must be exactly 10 bytes)
-    if(len == sizeof(MeshClockPacket)) {
-        const MeshClockPacket* packet = (const MeshClockPacket*)data;
-        
-        // Validate magic header "MCK"
-        if(packet->magic[0] == MESHCLOCK_MAGIC_0 &&
-           packet->magic[1] == MESHCLOCK_MAGIC_1 &&
-           packet->magic[2] == MESHCLOCK_MAGIC_2) {
-            
-            // Extract 56-bit timestamp (7 bytes) into uint64_t
-            uint64_t remoteMicros = 0;
-            for(int i = 0; i < 7; i++) {
-                remoteMicros |= ((uint64_t)packet->timestamp[i]) << (i * 8);
-            }
-            
-            _adjust(remoteMicros);
-            return true;  // Packet was handled
-        }
+    if(len != sizeof(MeshClockPacket)) {
+        Serial.printf("[MeshClock RX] Discarded: Wrong size (expected %d bytes)\n", sizeof(MeshClockPacket));
+        Serial.flush();
+        return false;
     }
-    return false;  // Not a clock packet
+    
+    const MeshClockPacket* packet = (const MeshClockPacket*)data;
+    
+    // Validate magic header "MCK"
+    if(packet->magic[0] != MESHCLOCK_MAGIC_0 ||
+       packet->magic[1] != MESHCLOCK_MAGIC_1 ||
+       packet->magic[2] != MESHCLOCK_MAGIC_2) {
+        Serial.printf("[MeshClock RX] Discarded: Invalid magic header (%02X %02X %02X)\n",
+                      packet->magic[0], packet->magic[1], packet->magic[2]);
+        Serial.flush();
+        return false;
+    }
+    
+    // Extract 56-bit timestamp (7 bytes) into uint64_t
+    uint64_t remoteMicros = 0;
+    for(int i = 0; i < 7; i++) {
+        remoteMicros |= ((uint64_t)packet->timestamp[i]) << (i * 8);
+    }
+    
+    uint32_t secs = remoteMicros / 1000000;
+    uint32_t usecs = remoteMicros % 1000000;
+    Serial.printf("[MeshClock RX] Valid clock packet: %llu us (%u.%06u s)\n", 
+                  remoteMicros, secs, usecs);
+    Serial.flush();
+    
+    _adjust(remoteMicros);
+    return true;  // Packet was handled
 }
 
 void ESPNowMeshClock::setUserCallback(ESPNowRecvCallback callback) {
@@ -181,7 +199,9 @@ void ESPNowMeshClock::_broadcast() {
     
     esp_err_t result = esp_now_send(bcastAddr, (uint8_t*)&packet, sizeof(packet));
     if(result == ESP_OK) {
-        Serial.printf("[MeshClock BCAST] Sent time: %llu\n", stamp);
+        uint32_t secs = stamp / 1000000;
+        uint32_t usecs = stamp % 1000000;
+        Serial.printf("[MeshClock BCAST] Sent time: %llu us (%u.%06u s)\n", stamp, secs, usecs);
         Serial.flush();
     } else {
         Serial.println("[MeshClock ERROR] Failed to send time");
