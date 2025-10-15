@@ -29,6 +29,14 @@ enum class SyncState {
     LOST     // Was synced, but timeout exceeded (link lost)
 };
 
+// Debug log flags
+enum DebugLog {
+    LOG_BCAST = 0x01,  // Broadcast messages
+    LOG_RX    = 0x02,  // Receive messages
+    LOG_SYNC  = 0x04,  // Sync adjustments
+    LOG_ALL   = 0xFF   // All messages
+};
+
 class ESPNowMeshClock {
 public:
     ESPNowMeshClock(uint16_t interval_ms = 1000, float slew_alpha = 0.25, uint32_t large_step_us = 10000, uint32_t sync_timeout_ms = 5000, uint8_t random_variation_percent = 10, ClockFn clkfn = nullptr);
@@ -37,6 +45,9 @@ public:
     uint64_t meshMicros();
     uint32_t meshMillis();
     SyncState getSyncState();
+    
+    // Debug log control
+    void setDebugLog(uint8_t flags) { _debugLog = flags; }
     
     // Option 1: Manual receive handling for custom ESP-NOW integration
     bool handleReceive(const uint8_t *mac, const uint8_t *data, int len);
@@ -58,6 +69,7 @@ private:
     uint32_t _lastBroadcast;
     uint32_t _nextBroadcastDelay;
     ESPNowRecvCallback _userCallback;
+    uint8_t  _debugLog;
 
     #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     static void _onReceive(const esp_now_recv_info *recv_info, const uint8_t *data, int len);
