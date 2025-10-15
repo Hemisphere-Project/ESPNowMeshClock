@@ -11,22 +11,26 @@ ESPNowMeshClock::ESPNowMeshClock(uint16_t interval_ms, float slew_alpha, uint32_
       _clock(clkfn ? clkfn : defaultClockFn), _offset(0), _synced(false), _lastSync(0), _lastBroadcast(0), _nextBroadcastDelay(0), _userCallback(nullptr)
 {
     _instance = this;
-    
-    // Initialize hardware timers for accurate 64-bit microsecond counting
-    // Only needed if using default clock (fastmicros64_isr)
-    if (!clkfn) {
+}
+
+void ESPNowMeshClock::begin(bool registerCallback) {
+    // Initialize hardware timers FIRST if using default clock
+    if (_clock == defaultClockFn) {
         static bool timersInitialized = false;
         if (!timersInitialized) {
             fastinit();
             timersInitialized = true;
+            delay(10);  // Give timers time to start
+            uint64_t test = _clock();
+            Serial.printf("[ESPNowMeshClock] Timer initialized, test read: %llu\n", test);
+            Serial.flush();
         }
     }
-}
-
-void ESPNowMeshClock::begin(bool registerCallback) {
+    
     WiFi.mode(WIFI_STA);
     if(esp_now_init() != ESP_OK) {
         Serial.println("[ERR] ESP-NOW INIT FAILED");
+        Serial.flush();
         delay(1000); ESP.restart();
     }
     
@@ -42,6 +46,7 @@ void ESPNowMeshClock::begin(bool registerCallback) {
     peerInfo.encrypt = false;
     if(!esp_now_is_peer_exist(bcastAddr)) esp_now_add_peer(&peerInfo);
     Serial.println("[ESPNowMeshClock] Started.");
+    Serial.flush();
 }
 
 uint64_t ESPNowMeshClock::meshMicros() { return _clock() + _offset; }
@@ -124,6 +129,7 @@ void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
     if(!_synced || abs(delta) > _largeStep) {
         _offset += delta; _synced = true;
         Serial.printf("[MeshClock SYNC] Direct clock set. Offset now: %lld\n", (int64_t)_offset);
+        Serial.flush();
         return;
     }
     if(delta > 0) {
@@ -131,6 +137,7 @@ void ESPNowMeshClock::_adjust(uint64_t remoteMicros) {
         _offset += step;
         Serial.printf("[MeshClock SYNC] Slewed clock: Offset %lld, Step %llu, Delta %lld\n",
                       (int64_t)_offset, step, (int64_t)delta);
+        Serial.flush();
     }
     // If delta < 0, local is already ahead - no adjustment needed (forward-only)
 }
@@ -152,8 +159,10 @@ void ESPNowMeshClock::_broadcast() {
     esp_err_t result = esp_now_send(bcastAddr, (uint8_t*)&packet, sizeof(packet));
     if(result == ESP_OK) {
         Serial.printf("[MeshClock BCAST] Sent time: %llu\n", stamp);
+        Serial.flush();
     } else {
         Serial.println("[MeshClock ERROR] Failed to send time");
+        Serial.flush();
     }
 }
 
