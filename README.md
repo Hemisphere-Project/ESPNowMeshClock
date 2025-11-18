@@ -443,3 +443,7 @@ Only packets matching this exact format will be processed as mesh clock packets.
 
 - `ESPNowMeshClock` by Hemisphere-Project
 - `libclock` by peufeu
+
+## License
+
+ESPNowMeshClock core sources (`src/ESPNowMeshClock.*` and examples) are licensed under **GPL-3.0-or-later**. The bundled `src/libclock` directory remains under its original **MIT** terms from peufeu. When redistributing, keep both notices intact so downstream users understand which parts fall under which license.

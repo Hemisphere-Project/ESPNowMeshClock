@@ -8,7 +8,5 @@
   "license": "GPL-3.0",
   "frameworks": "arduino",
   "platforms": ["espressif32"],
-  "dependencies": [
-    {"name": "libclock"}
-  ]
+  "dependencies": []
 }
